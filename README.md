@@ -1,183 +1,182 @@
-# SCRL course project: return seeking and residual risk control
+# SCRL project: budgeting the return cost of risk interventions
 
-This repository contains a course proposal and research recommendations for portfolio reinforcement learning using IntelliQuant as a potential data and backtesting platform.
+**Research question:** Can a personalized residual risk controller reduce portfolio drawdown while explicitly limiting the positive net-return shortfall caused by its interventions?
 
-**Recommended question:** Can a separately trained risk controller improve the out-of-sample return–risk trade-off of a frozen return-seeking policy beyond volatility targeting, conventional portfolio optimization, and joint reward training?
+Train a return-seeking portfolio policy, freeze it, and learn a risk correction. Simulate an untouched reference account and a corrected account on the same market path, each with separate holdings, wealth, and costs. The proposed component budgets the corrected account's **positive shortfall relative to the executable reference policy**, rather than relying only on small action corrections or an average-return floor.
 
-The central idea is to separate return seeking from risk management, then test whether that separation is useful when prices are exogenous but portfolio holdings, costs, wealth, and drawdown depend on actions. Model-free versus model-based training is a controlled comparison within this project. AR/VAR and recurrent market models are supporting methods, rather than independent research contributions.
+This is a proposed **Type II application extension**, not an established first in the literature or a new general safety principle. Exact overlap with prior work still requires verification. Policy transfer is not a requirement. Model-based market scenarios are optional.
 
-**Status:** Research design and proposal draft only. No trading environment, trained policies, data export, or empirical results have been implemented or validated. Platform assessment was checked against public documentation on **October 28, 2026**, with a read-only inspection of the signed-in strategy overview and a sample editor. Account-specific entitlements, runtime behavior, and data quality remain unverified.
+## Status and files
 
-## Repository contents
+This repository contains research design only. No environment, data pipeline, trained policy, or empirical result has been implemented or validated. The IntelliQuant assessment uses public documentation and a read-only inspection of the strategy overview/sample editor on **October 28, 2026**. Account entitlements, data export, inference runtime, and data quality remain unverified.
 
 | File | Purpose |
 | --- | --- |
-| [StochRL26_ID_Name_Proposal.tex](StochRL26_ID_Name_Proposal.tex) | Original course template; specifies a two-page body limit, excluding references. |
-| [StochRL26_ResidualRisk_Proposal_Draft.tex](StochRL26_ResidualRisk_Proposal_Draft.tex) | Draft research proposal following the template's sections. |
-| [README.md](README.md) | Expanded rationale, platform assessment, experimental design, and implementation recommendations. |
+| [StochRL26_ID_Name_Proposal.tex](StochRL26_ID_Name_Proposal.tex) | Original course template, preserved. |
+| [StochRL26_ResidualRisk_Proposal_Draft.tex](StochRL26_ResidualRisk_Proposal_Draft.tex) | Current proposal centered on paired accounts and an intervention-loss budget. |
+| [README.md](README.md) | Expanded formulation, research rationale, experimental plan, and platform assessment. |
 
-The draft still has author/student-ID placeholders. The built-in LaTeX compiler could not start because of an environment setup failure; successful compilation and compliance with the two-page body limit have **not** been verified. This README expands the reasoning and does not replace the submission-length proposal.
+The proposal has name/student-ID placeholders. The built-in LaTeX compiler cannot start because of an environment setup failure. Compilation and actual PDF page count remain unverified; the source targets two pages including references. Update this status only after successful compilation and page-count inspection.
 
-## 1. Why trading can still require sequential control
+## Course requirements
 
-For a small price-taking trader, it is reasonable to assume an allocation decision does not change the market price process. It does not follow that the action leaves the entire state unchanged.
+The supplied slides require a course-related topic with **at least one novel component** and a **two-page** proposal containing:
 
-Let market observations be represented by history $h_t$ and let $z_t$ contain the account state. The structural assumptions are
+1. Title.
+2. Motivation and problem definition.
+3. Literature review.
+4. Main ideas and novelty.
+5. Expected contributions.
+6. Detailed plan.
+7. References.
+
+The slides allow Type I theory/algorithm projects, Type II applications to practical problems, and Type III combinations. This project targets Type II. The original template excludes references from its body limit, while the slide simply states two pages; the current draft conservatively targets two pages total. Reproducing a safety architecture on another dataset alone is not the claimed component.
+
+## 1. Motivation: budget the controller's economic harm
+
+A risk controller can reduce drawdown by holding cash and missing profitable trades. Small allocation changes need not have small financial consequences. An average-return constraint also allows profitable interventions to offset harmful ones.
+
+For example, suppose reference-minus-controlled cumulative log-growth gaps in two equally weighted episodes are +0.03 and -0.03. The signed average gap is zero, but average **positive shortfall** is 0.015. The new constraint registers sacrificed return rather than cancelling it against another episode's gains.
+
+The hypothesis is that explicitly budgeting this shortfall produces a useful held-out drawdown–shortfall frontier. It could instead cause excessive conservatism or perform no better than fine-tuning. That outcome must be reported.
+
+## 2. Price-taking market and controlled account state
+
+Start with **three Korean ETFs plus cash**, long-only, without leverage. Choose a diverse universe using historical eligibility and liquidity information rather than today's successful funds. Verify symbols and listing histories before fixing the experiment.
+
+For market history $h_t$ and account state $z_t$, assume
 
 $$
 P(x_{t+1}\mid h_t,z_t,a_t)=P(x_{t+1}\mid h_t),
 \qquad z_{t+1}=F(z_t,a_t,x_{t+1}).
 $$
 
-The first equality assumes the account carries no additional market information beyond the observed market history. A finite feature window is an approximate information state, not a proven Markov state.
+Market history is assumed to contain any market information carried by the account; finite-window features only approximate an information state. Orders do not move prices, but they change positions, cash, wealth, subsequent turnover costs, and drawdown.
 
-| Exogenous market information | Controlled account state |
-| --- | --- |
-| Prices, returns, trading volume | Holdings and portfolio weights |
-| Market indicators and historical features | Cash and wealth |
-| Publicly available fundamentals | Previous positions and future turnover costs |
-| Market regime proxies | Running peak wealth and drawdown |
+Use close-of-day information to form orders executed at the next open. Target weights become feasible orders with explicit cash, lot-size, cost, and opening-gap treatment. Define commissions, taxes, slippage, distributions, adjusted/raw prices, cash interest, and terminal accounting. Never observe the next day's close/range when deciding at its open.
 
-Holding a position today affects what it costs to rebalance tomorrow. A loss changes drawdown and can affect a later risk constraint. These effects motivate sequential control even without market impact.
+With exogenous observations, no costs, no account-dependent constraints, and an additive per-period utility, allocation can reduce to conditional one-step optimization. Time-series data alone does not justify sequential RL. Here, costs and path-dependent drawdown create the sequential problem.
 
-There is also an important limiting case: with action-independent future observations, no costs, no account-dependent feasible sets, and an additive objective whose period utility depends only on the current market information and allocation, each decision reduces to conditional one-step utility maximization. Autocorrelated returns alone do not invalidate that decomposition. This is a useful diagnostic and a modest theoretical observation, not a major novelty claim.
+## 3. Paired-account objective and residual policy
 
-**Recommendation:** Include costs and account state explicitly, and compare against a one-step allocator. Do not justify RL solely by saying that prices form a time series.
+### Reference and controlled trajectories
 
-## 2. What to take from the supplied paper
+Train a nominal PPO policy for net log growth, then freeze its parameters **and deployment action rule**. Prefer deterministic reference actions for paired evaluation.
 
-The supplied paper is [ResSafe: Learning Safety Filtering with Residual Reinforcement Learning for Humanoids](https://arxiv.org/abs/2609.15988). Its relevant architecture freezes a task policy and trains a residual action correction. It is not simply a method that learns several reward weights in parallel. Its robotics objective includes survival and intervention costs, and the authors do not claim hard safety guarantees for the learned filter.
+For every fixed $T$-day episode $\omega$, initialize two accounts with identical capital and positions:
 
-The proposed financial adaptation is our research recommendation: first learn net-return-seeking allocations, then learn risk corrections while limiting degradation in the original objective. Robotics safety results do not establish financial risk guarantees.
-
-Keep three different meanings of “weights” separate:
-
-| Quantity | Meaning | Suggested treatment |
+| Account | Action source | State evolution |
 | --- | --- | --- |
-| Portfolio weights $w_t$ | Capital allocated to assets and cash | Policy output |
-| Reward coefficients | Relative scaling of return, risk, and intervention terms | Small preregistered validation grid or explicit constraints |
-| Network parameters | Parameters of nominal policy, residual policy, and critics | Optimize during the relevant training stage |
+| Untouched reference | $\pi_0(h_t,z_t^0)$ | Own holdings, wealth, fees, and drawdown |
+| Controlled | Corrected recommendation of $\pi_0(h_t,z_t^\phi)$ | Own holdings, wealth, fees, and drawdown |
 
-Separate critics can estimate return and risk in parallel. Separate residual experiments can also share a frozen nominal policy. Neither arrangement automatically resolves conflicts among objectives. Jointly updating both actors would be a different experimental condition because it removes the frozen reference.
+The reference must never inherit corrected holdings. The nominal recommendation within the controlled system must use the controlled account's actual state. Identical market paths do not imply identical account trajectories.
 
-## 3. Recommended formulation
-
-### Assets, observations, and actions
-
-Start with **3–5 liquid Korean ETFs plus cash**, long-only, without leverage. Choose an economically diverse universe using eligibility and liquidity information available at the start of the experiment, rather than selecting today's successful funds retrospectively. Exact symbols depend on verified listing dates and history coverage.
-
-Use a compact feature set: lagged returns, trailing volatility, a few momentum measures, current holdings, cash fraction, and drawdown. Avoid a large technical-indicator search. Fundamentals are optional for a later stock-universe extension; an ETF allocation project does not need every field the platform provides.
-
-Actions specify target weights on the asset-plus-cash simplex. The simulator converts targets into feasible orders, including lot sizes, cash constraints, and execution timing. Target weights are not guaranteed to equal realized weights after next-open price gaps and rounding.
-
-### Stage A: train the nominal policy
-
-Use one continuous-allocation algorithm, initially PPO, to maximize mean net log growth:
+Define
 
 $$
-g_{t+1}=\log(V_{t+1}/V_t),
-\qquad J(\pi)=\mathbb{E}\left[\frac1T\sum_{t=0}^{T-1}g_{t+1}\right].
+G_i(\omega)=\log\frac{V_T^i}{V_0^i},
+\qquad L_\phi(\omega)=[G_0(\omega)-G_\phi(\omega)]_+.
 $$
 
-Wealth must come from self-financing account updates with costs included. This objective is a precise interpretation of “return foremost”; expected log growth is not identical to expected arithmetic profit. State the chosen objective consistently in the proposal and evaluation.
+Growth includes costs. Fix the horizon before comparing budgets: cumulative log-return tolerance over an episode is different from a mean daily-return tolerance or a guaranteed arithmetic percentage-point return floor.
 
-Then freeze the nominal network $\pi_0$. During corrected rollouts, query it on the **actual corrected account state**, including the positions produced by previous residual decisions.
-
-### Stage B: learn a residual risk controller
-
-Let $w_t^0=\pi_0(h_t,z_t)$. A residual policy proposes a correction:
+For controlled wealth, define
 
 $$
-w_t=\operatorname{Proj}_{\Delta^{K+1}}
-\left(w_t^0+\delta_\phi(h_t,z_t,w_t^0)\right).
+d_t=1-\frac{V_t^\phi}{\max_{u\le t}V_u^\phi},
+\qquad D_t=\max_{u\le t}d_u.
 $$
 
-A bounded correction is a useful implementation option. Projection enforces target allocation limits; order execution still needs its own feasibility checks.
-
-For an estimated conditional covariance matrix $\widehat\Sigma_t$, including the chosen cash model, define
+The primary problem is
 
 $$
-C(\phi)=\mathbb{E}\left[\frac1T\sum_t
-\left(w_t^\top\widehat\Sigma_t w_t+
-\eta\|w_t-w_t^0\|_2^2\right)\right].
-$$
-
-The suggested primary problem is
-
-$$
-\min_\phi C(\phi)
+\min_\phi\;\mathbb E[D_T]
 \quad\text{subject to}\quad
-J(\pi_\phi)\ge J(\pi_0)-\epsilon.
+\mathbb E[L_\phi]\le\epsilon.
 $$
 
-Fix $\epsilon$ using training/validation data, in mean daily net log-return units. It allows some return sacrifice in exchange for risk reduction. A strict zero-tolerance profit-first objective may leave little freedom to improve risk.
+### Personalized residual controller
 
-An implementable Lagrangian is
+For a nominal recommendation $w_t^0=\pi_0(h_t,z_t^\phi)$, use
 
 $$
-\mathcal L(\phi,\lambda)=C(\phi)+
-\lambda\left[J(\pi_0)-\epsilon-J(\pi_\phi)\right],
+w_t=\operatorname{Proj}_{\Delta^4}
+\left[w_t^0+\delta_\phi(o_t,w_t^0)\right].
+$$
+
+The observation can include lagged returns, volatility, both current account states, nominal allocation, relative cumulative growth, and time remaining. The untouched reference is a causal shadow account, updated using observed prices and modeled costs. It needs no real reference-account trades or future prices. Future outcomes supply completed training feedback and evaluation metrics only.
+
+Projection enforces target weight limits; actual order execution still requires account feasibility. Include an explicit zero-correction bypass. With matched initialization and action/execution rules, bypass reproduces the reference and gives zero shortfall, so it is a feasible candidate for any nonnegative budget. This is a basic feasibility property, not an optimization or financial safety guarantee.
+
+### What the constraint means
+
+The signed alternative is $\mathbb E[G_0-G_\phi]\le\epsilon$. Because $u\le[u]_+$, the positive-shortfall constraint implies the signed constraint for the same episode distribution and budget. The converse does not generally hold. This elementary relationship motivates the experiment and is not claimed as a new theorem.
+
+The constraint controls **expected positive terminal shortfall**. It does not bound every episode, maximum interim underperformance, CVaR, drawdown itself, or future-market losses. Shortfall may reflect sacrificed upside even when both policies profit. A small relative shortfall does not establish that the nominal strategy is profitable in absolute terms.
+
+## 4. Training and implementation
+
+1. Split market data chronologically. Keep complete episode targets inside their own split.
+2. Fit causal features, train a compact nominal PPO policy for net growth, select its checkpoint using validation data, and freeze it.
+3. Sample a training market window and simulate reference and controlled accounts with separate transitions.
+4. Compute maximum drawdown and terminal positive shortfall. Optimize
+
+$$
+\mathcal L(\phi,\lambda)=\mathbb E[D_T]+
+\lambda\left(\mathbb E[L_\phi]-\epsilon\right),
 \qquad \lambda\ge0.
 $$
 
-Minimize over the policy parameters and increase the multiplier when the estimated return floor is violated. Estimate nominal and corrected performance on comparable episodes. Normalize quantities before selecting learning rates; variance and log-return terms can have very different numerical scales.
+5. Minimize over policy parameters and increase the multiplier on estimated budget violations. Separate critics can estimate the two costs; critics alone do not enforce the constraint.
+6. Use undiscounted finite episodes. Costs $D_{t+1}-D_t$ telescope to terminal maximum drawdown when $D_0=0$. Positive increments of **current** drawdown do not have that property. Compute shortfall from complete paired episodes and preserve terminal costs on failures.
+7. Select a small budget grid and learning settings on validation data, then evaluate frozen policies on untouched market periods.
 
-This is approximate constrained optimization with estimation and optimization error. Freezing the nominal network does **not** preserve its returns automatically, and satisfying the empirical constraint does not guarantee the return floor on unseen data.
+Terminal shortfall supplies credit to earlier actions through trajectory learning; it need not be a differentiable per-step reward. Define account-feasibility and failure handling to avoid invalid wealth logarithms or silently deleting losing episodes. Report costs of stochastic exploration during training.
 
-Variance alone can favor an all-cash allocation. The return floor, cash-exposure reporting, and matched-risk comparisons are essential to distinguish useful control from merely taking less risk.
+## 5. Main ideas and novelty
 
-### Controlled reward alternatives
+The proposed component is **budgeting the economic consequence of personalized risk interventions through paired self-financing accounts**. It adapts counterfactual safety to a price-taking portfolio setting and uses positive benchmark-relative shortfall instead of a gain-cancelling signed floor.
 
-| Objective or cost | Role | Main limitation |
+| Prior work | Established idea | Proposed distinction |
 | --- | --- | --- |
-| Net log growth | Nominal objective | Sensitive to accounting and cost assumptions |
-| $w_t^\top\widehat\Sigma_t w_t$ | Primary conditional variance proxy | Depends on covariance quality; not realized full-horizon variance |
-| $\max(0,-r_{p,t+1})^2$ | Downside-risk ablation | Focuses on losses rather than all volatility |
-| $\max(0,d_{t+1}-d_t)$ | Drawdown-increment ablation | Its sum is not maximum drawdown |
-| Terminal maximum drawdown or episode loss CVaR | Optional path/tail-risk extension | Requires appropriate trajectory-level estimation |
-| Squared residual size | Preserve nominal behavior | Small allocation changes do not guarantee small performance changes |
+| [ResSafe](https://arxiv.org/abs/2609.15988) | Frozen task policy plus learned safety residual | Budget financial shortfall against an executable policy rather than relying on small allocation changes |
+| [RiPO](https://arxiv.org/abs/2306.07013) | Barrier-function portfolio risk correction | Learn personalized episode-drawdown intervention with a positive-shortfall budget |
+| [Do No Harm](https://proceedings.mlr.press/v242/vaskov24a.html) | Counterfactual harm relative to an alternative policy | Adapt comparison to net portfolio growth with two cost-bearing account trajectories |
+| [Regret-Optimized Portfolio Enhancement](https://arxiv.org/html/2502.02619) | Portfolio enhancement using future-looking oracle regret | Use the frozen executable policy as reference and constrain its positive shortfall |
 
-Do not treat per-step squared returns as an exact implementation of horizon variance, or average per-step Sharpe ratios as the portfolio Sharpe ratio. Use a small, predefined set of reward ablations. A CVaR extension must identify the loss variable, horizon, and confidence level; daily-return CVaR and terminal-wealth CVaR are different objectives.
+These are positioning differences, **not proof of a first-in-literature claim**. Benchmark-relative downside measures, risk-aware RL, and paired replay are established. Check exact formulation overlap before submission. Neither modularity, transferability, Korean data, nor an RNN alone is sufficient novelty.
 
-## 4. Model-free and model-based comparison
+The empirical questions are:
 
-### Model-free core
+- Does positive-shortfall budgeting improve the held-out drawdown–shortfall frontier over a signed mean-return floor?
+- Does a frozen nominal policy plus residual add value beyond fine-tuning under the same budget?
+- Does learned adaptation beat simple risk overlays after costs and cash exposure are controlled?
 
-Train the residual policy on historical episodes with explicit account transitions. PPO may collect new trajectories by replaying market windows under its current policy. Replaying a known path is not collecting a new independent market realization.
+The stricter constraint may sacrifice more return or fail to generalize. Report these possibilities directly.
 
-Under the price-taking assumption, observed asset returns and a specified execution model permit simulated evaluation of alternative allocations on the same market path. This makes ordinary historical portfolio replay different from settings where only the reward for one logged action is known. It does not reveal actual unobserved fills or remove market-impact uncertainty.
+## 6. Baselines and optional market models
 
-### Model-based extension
+| Method | Purpose |
+| --- | --- |
+| Unchanged nominal policy | Reference performance and zero-intervention candidate |
+| Residual with signed mean-return floor | Isolate the constraint change |
+| Residual with positive-shortfall budget | Proposed adaptation |
+| Fine-tuning with the same positive-shortfall budget | Test the need for a separate correction network |
+| Capacity-matched fine-tuning of both nominal and residual networks | Separate parameter freezing from extra capacity |
+| Nominal plus volatility targeting / drawdown rule | Test whether learning is necessary |
+| Covariance-based minimum-deviation optimizer, if feasible | Conventional optimization comparison |
+| Equal weight | Contextual allocation baseline |
 
-Learn the exogenous market process and retain deterministic, explicit account accounting:
+Initialize adaptations from identical nominal checkpoints and zero-output residuals. Match observations, execution, costs, and tuning budgets. Report trainable parameter counts and compute for pretraining and adaptation. Sweep validation-selected budgets: identical numeric tolerances do not guarantee identical realized risk or constraint satisfaction.
 
-1. Fit an AR model for a single return series, or a regularized VAR for multiple assets.
-2. Sample **joint** residual vectors or blocks to retain cross-asset dependence; use a suitable volatility model if needed.
-3. Generate short, coherent market scenarios using only the training period.
-4. Roll portfolio states through those scenarios and use the transitions for residual-policy optimization.
-5. Evaluate the frozen policy on untouched real market periods.
+An action-norm penalty is an optional ablation, not the main preservation mechanism. Calibrate exposure-matched controls on validation data. Hindsight test-return rescaling is not an executable strategy.
 
-A small probabilistic GRU/RNN or ensemble can be added after the VAR experiment works. A point forecast alone does not specify a useful distribution for risk estimation. Check dependence, volatility, tail behavior, and multi-step errors as well as mean prediction error.
+**Model-free core:** train with historical market replay and explicit accounting. Paired paths reduce noise in comparisons under the simulator; they do not create independent market evidence or reveal real unobserved fills.
 
-**An AR/RNN forecast used only as a feature is forecast-assisted model-free RL, not by itself model-based RL.** A forecast-driven optimizer without a learned policy is a model-based control baseline. Keep these labels distinct.
+**Optional model-based extension:** fit a regularized VAR on training data and use short scenarios with jointly resampled residuals for residual-policy training. Keep the same nominal policy/account model. A probabilistic GRU/RNN follows only if resources permit. Forecast features alone do not constitute model-based RL; generated transitions must enter optimization. Synthetic paths are not additional independent test evidence.
 
-For a focused comparison, hold the nominal policy fixed across model-free and model-based residual variants. Use common random numbers or shared historical paths for paired policy comparisons. Synthetic rollouts can improve training coverage under the fitted model, but cannot manufacture independent evidence or guarantee unseen crash coverage.
-
-## 5. Novelty and the standard of evidence
-
-The following are insufficient novelty claims by themselves:
-
-- Applying PPO to prices.
-- Adding volatility, drawdown, or Sharpe terms to a reward.
-- Comparing AR and RNN forecasts.
-- Combining a return model with a risk module.
-- Replaying the same price path under different allocations.
-
-A stronger course contribution is a careful answer to **when modular risk learning adds value in an exogenous market with controlled account dynamics**. Possible evidence includes better trade-offs after costs, less tuning sensitivity, robustness across regimes, and transfer to unseen nominal-policy checkpoints. Reusability must be tested; it is not implied by modular architecture.
-
-Risk-aware RL and model-guided portfolio constraint correction already exist. Relevant starting points include [lexicographic multi-objective RL](https://www.ijcai.org/proceedings/2022/0476.pdf), [percentile risk-constrained RL](https://www.jmlr.org/papers/v18/15-636.html), and [neural-progressive hedging](https://proceedings.mlr.press/v180/ghosh22a.html). These motivate baselines and terminology; the literature check so far is not an exhaustive novelty review.
-
-## 6. IntelliQuant assessment
+## 7. IntelliQuant assessment
 
 ### Verified capabilities and boundaries
 
@@ -245,58 +244,41 @@ If training-data extraction is unavailable, train on a separately licensed datas
 
 These are pending checks, not claims that the platform lacks the capabilities.
 
-## 7. Baselines and ablations
+## 8. Evaluation and verification
 
-| Method | What it tests |
-| --- | --- |
-| Equal-weight portfolio | Whether complexity beats a simple allocation rule |
-| Uncorrected nominal PPO | Benefit and cost of intervention |
-| Joint return–risk PPO | Whether two-stage training helps beyond a weighted reward |
-| Nominal plus volatility targeting | Whether gains are explained by exposure reduction |
-| Nominal plus minimum-deviation covariance optimizer | Whether an ordinary optimization filter suffices |
-| Forecast plus one-step allocation | Whether prediction and myopic optimization explain the result |
-| Direct policy optimization through differentiable replay, if feasible | Whether sequential optimization needs policy-gradient RL specifically |
-| Model-free residual PPO | Core proposed method |
-| VAR-scenario residual PPO | Added value of a learned market simulator |
-| GRU-scenario residual PPO, optional | Whether added model capacity helps after simpler methods work |
+1. **Chronology:** Use training, validation, and untouched test blocks, with walk-forward folds where coverage permits. Purge episode/forecast targets crossing boundaries; past observations may initialize causal features.
+2. **Preprocessing:** Fit scalers/predictors without test information. Rolling features can update from past data under fixed rules. Do not retune policies inside test blocks.
+3. **Episodes:** Fix horizon, positions, cash model, reset rules, and terminal accounting. Use non-overlapping test episodes where feasible and report continuous portfolio paths too. A terminal budget does not constrain maximum interim underperformance.
+4. **Metrics:** Net growth/CAGR, maximum drawdown, volatility, Sharpe, mean positive shortfall, signed mean growth gap, shortfall frequency/severity, turnover, cash exposure, and empirical budget violations.
+5. **Uncertainty:** Pair comparisons on identical market windows. Use multiple seeds and moving-block resampling where appropriate, recomputing path-dependent metrics. Seeds and overlapping windows are not independent market samples. Short histories cannot support strong tail guarantees.
+6. **Selection:** Choose horizon, budget grid, checkpoints, and settings using validation data. Report relevant frontiers and tuning budgets. Distinguish empirical training violations from held-out violations.
+7. **Stress:** Increase costs/slippage and examine adverse held-out regimes. Test model misspecification if scenario training is added.
+8. **Replication:** Reconcile local/IntelliQuant weights, trades, fees, and equity before interpreting metric discrepancies. Evaluate a distilled policy as a separate approximation.
 
-Keep information, leverage limits, timing, costs, training periods, and tuning budgets comparable. Report both stages' total training compute. Match volatility or exposure using validation-calibrated controls; do not rescale test returns with hindsight and present them as an executable strategy.
+Planned implementation checks: bypass reproduces reference trades and wealth; account states are independent; identical growth gives zero shortfall; outperformance never creates negative shortfall; terminal losses survive episode completion/failure; and maximum-drawdown costs telescope correctly. These are verification targets, not tests already implemented or passed.
 
-Priority ablations are removing costs/path dependence, removing the residual intervention penalty, varying the return tolerance, comparing risk definitions, and testing frozen versus joint training. Transfer across nominal checkpoints and conditioning on forecast uncertainty are extensions. Avoid a full Cartesian sweep of algorithms, predictors, rewards, and asset universes.
-
-## 8. Evaluation protocol
-
-1. **Chronological splits:** Separate training, validation, and untouched test blocks. Use walk-forward folds where history permits. A 6/2/2-year split is only an example conditional on actual coverage; expanding-window folds may use data more efficiently.
-2. **Causal preprocessing:** Fit scalers and learned predictors on training data. Rolling indicators/covariances can update during testing using observations available by the decision time, following a fixed rule. Do not retune on test outcomes.
-3. **Horizon handling:** Purge training labels or scenario targets that overlap validation/test targets. Using past training-period observations as the initial test feature history is legitimate; using future test returns to fit a model is not.
-4. **Account continuity:** Specify initial positions and cash and whether portfolios carry across test blocks. Do not hide liquidation, startup, or reset costs.
-5. **Execution audit:** Form decisions after close and execute at the next open. Define how opening gaps, integer orders, unfilled orders, dividends, and cash interest are treated.
-6. **Metrics:** Report net growth/CAGR, annualized volatility, Sharpe with a stated cash benchmark, maximum drawdown, turnover, cash exposure, realized tail-loss statistics, and return-floor violations.
-7. **Uncertainty:** Run multiple training seeds and use paired moving-block bootstrap intervals where appropriate. Preserve dependence in resampling. Seeds measure optimization variability, not independent market evidence. Interpret Sharpe and tail estimates cautiously with short samples.
-8. **Stress tests:** Increase costs/slippage, examine adverse held-out regimes, and test forecast misspecification. Model-generated stress is supplementary evidence.
-9. **Selection discipline:** Choose reward coefficients, tolerances, checkpoints, and model capacity using validation data. Report the selection procedure and budget.
-10. **Replication:** Compare local and IntelliQuant portfolio paths and investigate discrepancies in weights, trades, fees, and equity before comparing headline metrics.
-
-Success means a repeatable improvement in the relevant return–risk frontier after costs and against conventional controls. If a standard optimizer or volatility rule matches the residual policy, that is an informative result about the limits of learned risk control.
-
-## 9. Suggested five-week plan
+## 9. Detailed plan and expected contributions
 
 | Period | Deliverable | Decision gate |
 | --- | --- | --- |
-| Week 1 | Verified data path, asset universe, accounting specification, simple replication | If export is unavailable, adopt a licensed training source immediately. |
-| Week 2 | Nominal PPO and simple allocation/risk baselines | Confirm causal execution and credible baseline behavior. |
-| Week 3 | Joint-reward and residual PPO with return-floor monitoring | Establish the core comparison before adding a market model. |
-| Week 4 | Walk-forward results and VAR scenario ablation | Add GRU only if the core results and uncertainty estimates are complete. |
-| Week 5 | Stress tests, platform discrepancy audit, figures, and report | Freeze final settings and report negative findings as well as positive ones. |
+| Week 1 | Data route, fixed ETF universe, causal paired-account simulator | Adopt separately licensed data if IntelliQuant extraction is unavailable. |
+| Week 2 | Nominal PPO, shadow-account feedback, conventional controls | Verify costs, bypass equality, and no future-data observations. |
+| Week 3 | Signed-floor residual, proposed residual, and fine-tuning controls | Separate constraint effects from architecture effects. |
+| Week 4 | Held-out frontiers, seeds, uncertainty, and cost stress | Add VAR scenarios only after the core evidence is complete. |
+| Week 5 | Platform discrepancy audit, figures, and final submission | Present positive and negative findings with their limits. |
 
-The minimum viable project is one ETF universe, one nominal algorithm, joint versus residual training, strong non-RL risk controls, and credible held-out evaluation. A large RNN, multiple RL algorithms, CVaR optimization, and extensive transfer experiments should not all be prerequisites for finishing the course project.
+Expected contributions are the financial intervention-budget formulation, paired-account implementation, controlled empirical comparison, and documented platform feasibility/replication findings. Success needs evidence beyond increased cash exposure. If fine-tuning or simple controls match the residual policy, that limits the case for residual learning and is a finding to report.
+
+The minimum project uses one ETF universe, one nominal PPO policy, one drawdown objective, a small budget grid, and strong controls. Transfer, CVaR optimization, many RL algorithms, and large recurrent market models are not requirements.
 
 ## 10. References and open decisions
 
-- [ResSafe, arXiv:2609.15988](https://arxiv.org/abs/2609.15988): architectural inspiration.
-- [Skalse et al., Lexicographic Multi-Objective Reinforcement Learning, IJCAI 2022](https://www.ijcai.org/proceedings/2022/0476.pdf): prioritized objectives.
-- [Chow et al., Risk-Constrained Reinforcement Learning with Percentile Risk Criteria, JMLR](https://www.jmlr.org/papers/v18/15-636.html): chance/CVaR constrained formulations.
-- [Ghosh et al., Neural-progressive hedging, UAI 2022](https://proceedings.mlr.press/v180/ghosh22a.html): prior model-guided constraint correction with portfolio applications.
+- [Qu et al., ResSafe, arXiv:2609.15988 (2026)](https://arxiv.org/abs/2609.15988): residual safety architecture.
+- [Li, Huang, and Tam, Combining Reinforcement Learning and Barrier Functions for Adaptive Risk Management in Portfolio Optimization, arXiv:2306.07013 (2023)](https://arxiv.org/abs/2306.07013): direct portfolio-controller precedent.
+- [Vaskov, Schwarting, and Baker, Do No Harm, L4DC 2024](https://proceedings.mlr.press/v242/vaskov24a.html): counterfactual safety foundation.
+- [Karzanov et al., Regret-Optimized Portfolio Enhancement, arXiv:2502.02619 (2025)](https://arxiv.org/abs/2502.02619): related portfolio regret method.
+- [Ghosh et al., Neural-progressive hedging, UAI 2022](https://proceedings.mlr.press/v180/ghosh22a.html): additional model-guided portfolio constraint precedent.
+- [Chow et al., Risk-Constrained Reinforcement Learning with Percentile Risk Criteria, JMLR](https://www.jmlr.org/papers/v18/15-636.html): broader constrained-risk formulations.
 - [IntelliQuant Studio guide](https://support.intelliquant.ai/guide/iq-studio), [Stock API](https://www.intelliquant.ai/help/ref/1), [environment API](https://www.intelliquant.ai/help/ref/15), and [membership](https://www.intelliquant.ai/membership): platform evidence.
 
-Before submission, settle the exact data source and rights, asset universe, date range, course emphasis, experiment budget, return tolerance, cash model, and primary risk metric. Complete the novelty review and verify the LaTeX layout. Keep reported facts, proposed methods, and untested hypotheses distinct throughout the proposal.
+Before submission, resolve literature overlap, dataset rights, ETF symbols, date range, episode horizon, cash assumptions, and validation-selected budgets. Fill author details and verify the compiled two-page layout. The slide's novel-component requirement is real; a candidate application extension should not be presented as established originality before that review.
