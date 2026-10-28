@@ -1,0 +1,67 @@
+\documentclass[10pt]{article}
+\usepackage[letterpaper,margin=0.75in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\title{Structure-Aware Model-Based Reinforcement Learning\\for Multiproduct Dynamic Pricing}
+\author{Name (Student ID), Seoul National University}
+\date{}
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+\section{Motivation and problem definition}
+Retail prices jointly affect demand for substitutes and complements. Ignoring these interactions can misprice products, whereas learning an unrestricted interaction matrix requires substantial data. Inventory further complicates learning: observed sales censor demand at stockout, and current prices change both future inventory and information. This theory-focused project asks: \emph{How does a known product-interaction graph affect finite-sample pricing-policy error when demand is learned from censored sales?} The central target is one estimation-to-value guarantee, rather than a new regret rate.
+
+Consider $n$ products and repeated $H$-period selling episodes with reset inventories and fixed unknown parameters $\theta=(a,B)$. Prices belong to a finite joint grid $\mathcal P$ with $p_i\ge c_i$. The initial model excludes replenishment and context. For known integer demand caps $M_i$, assume conditionally independent demands
+\begin{equation}
+ D_{i,t}\mid p_t\sim\operatorname{Binomial}\!\left(M_i,\frac{\mu_i(p_t)}{M_i}\right),
+ \qquad \mu(p)=a+Bp.
+\end{equation}
+A compact parameter set keeps $\mu_i(p)/M_i\in[\eta,1-\eta]$ for all admissible prices, with $\eta>0$. A known directed graph fixes off-diagonal zeros; known signs impose $B_{ij}\ge0$ for substitutes and $B_{ij}\le0$ for complements, with $B_{ii}\le0$. These encode cross-price effects, not a claim of full utility-theoretic rationalizability. With componentwise operations,
+\begin{equation}
+ Y_t=\min(D_t,I_t),\qquad I_{t+1}=I_t-Y_t,\qquad
+ r_t=\sum_i(p_{i,t}-c_i)Y_{i,t}.
+\end{equation}
+The state is inventory and time; actions jointly select prices to maximize expected total gross profit. Parameters are stationary across episodes. Stockouts cause lost sales without within-period rerouting. Specifying the demand distribution, rather than only its mean, makes stockout probabilities and inventory transitions identifiable under suitable data.
+
+\section{Literature review}
+Li and Huh~\cite{lihuh} study multiproduct pricing under logit choice and dynamic inventory settings. Ferreira et al.~\cite{ferreira} develop inventory-constrained revenue management with unknown demand using Thompson sampling. Osband and Van Roy~\cite{factored} establish that known MDP structure can reduce learning complexity. Thus, cross-product pricing, demand learning, and structural gains are established. The proposed contribution must be an explicit censoring-aware estimation-to-policy bound and its information conditions, rather than merely applying structured RL to retail.
+
+\section{Main ideas and novelty}
+\textbf{Structured model learning and planning.} Use sign- and support-constrained maximum likelihood, followed by finite-horizon dynamic programming in the fitted demand model. Collect initial exploratory pricing episodes and refit between episodes. The likelihood uses $\Pr_\theta(D_i=y\mid p)$ when $y<I_i$ and $\Pr_\theta(D_i\ge I_i\mid p)$ when $y=I_i$; zero inventory supplies no demand information. Naive regression on sales is not the proposed estimator. Exact planning is restricted to small inventory systems; any approximation error is accounted for separately.
+
+\textbf{Specific theoretical component.} Connect the information in censored observations on each product's price neighborhood to the loss of the resulting inventory-dependent policy. Compare known support with and without signs to distinguish sparsity from economic sign information. Signs alone do not reduce parameter dimension, and fewer parameters do not guarantee improvement if price variation or stockout information is insufficient. Originality of the precise bound will be checked against structured pricing and RL results.
+
+\newpage
+\section{Expected contributions}
+\textbf{Main theorem target.} Let $m_i=2+\deg^-(i)$ count the intercept, own-price, and relevant cross-price coefficients. For $N$ observed periods, derive a high-probability bound for the constrained censored-likelihood estimator. State explicitly the required curvature/exploration event: the normalized row likelihood has curvature at least $\kappa_i>0$, and its score error is at most $\beta_i(N,\delta)$. The target parameter error scales as $\beta_i/\kappa_i$, with score concentration depending on $m_i$, bounded prices, and $\eta$. Establish sufficient exploration conditions in a restricted small-system setting; do not assume stockouts preserve information.
+
+Let $\hat\pi$ be a policy planned in the fitted model, $R_{\max}$ a per-period reward bound, and $L_i$ a bound on the row price-feature norm. Combine estimation with demand-distribution coupling and a finite-horizon simulation argument to target
+\begin{equation}
+ V_1^*(I)-V_1^{\hat\pi}(I)
+ \ \le\ O\!\left(H^2R_{\max}\sum_i
+ L_i\frac{\beta_i(N,\delta)}{\kappa_i}\right)+\varepsilon_{\rm plan}.
+\end{equation}
+All values on the left use the true demand model. Binomial coupling bounds joint demand total variation by the sum of mean errors; censoring and inventory updates cannot increase it. This also controls expected reward error. The contribution sought is explicit graph-local score/curvature dependence under adaptive, censored observations; the generic simulation lemma is existing machinery. A useful structural advantage requires comparing against a dense model under comparable excitation and censoring, not just counting parameters. The theorem is a target, not a claimed result.
+
+\section{Detailed plan}
+\textbf{Weeks 1--2: assumptions and estimator.} Review the closest structured-pricing results; fix the finite price grid, inventory caps, graph, and compact parameter set. Derive the censored likelihood and score properties. Identify conditions giving informative exploratory prices and positive curvature, and characterize failure at sustained zero inventory. Write a precise theorem statement before implementation expands.
+
+\textbf{Weeks 3--4: proof.} Prove score concentration for adaptively chosen prices, conditional on the stated exploration conditions. Derive the constrained-estimator bound and propagate it through the binomial inventory kernel to policy error. Track horizon, graph-local dimension, information loss, and planning error explicitly. If uniform exploration cannot be justified, report the conditional theorem and its limitations rather than claim an unconditional learning guarantee.
+
+\textbf{Week 5: numerical illustration and paper.} Use three-product synthetic examples with substitutes and complements, small inventories, and exact dynamic programming. Compare signed sparse, unsigned same-support, dense, and independent-product estimators with the same planner; include certainty-equivalent control and the true-model oracle. Vary stockout severity, price excitation, and graph misspecification; measure parameter error, kernel error, and true-model policy loss across seeds. These experiments illustrate the theorem, rather than replace it.
+
+\textbf{Scope and deliverables.} Deliver one finite-sample theorem with supporting lemmas, a small reproducible simulator, and an explicit account of when structural gains disappear. Full regret bounds, graph discovery, posterior-contraction analysis, nonlinear choice models, and large-scale MPC are outside the core project. This is a theory-oriented project; a modeling formulation alone will not count as its theoretical contribution.
+
+\begingroup
+\small
+\begin{thebibliography}{9}
+\setlength{\itemsep}{1pt}
+\bibitem{lihuh} H. Li and W. T. Huh. \emph{Pricing Multiple Products with the Multinomial Logit and Nested Logit Models: Concavity and Implications}. Manufacturing \& Service Operations Management, 13(4):549--563, 2011. \href{https://doi.org/10.1287/msom.1110.0344}{Paper}.
+\bibitem{ferreira} K. J. Ferreira, D. Simchi-Levi, and H. Wang. \emph{Online Network Revenue Management Using Thompson Sampling}. Operations Research, 66(6):1586--1602, 2018. \href{https://doi.org/10.1287/opre.2018.1755}{Paper}.
+\bibitem{factored} I. Osband and B. Van Roy. \emph{Near-optimal Reinforcement Learning in Factored MDPs}. NeurIPS 27, 2014. \href{https://arxiv.org/abs/1403.3741}{Paper}.
+\end{thebibliography}
+\endgroup
+\end{document}

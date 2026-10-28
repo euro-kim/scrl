@@ -14,9 +14,18 @@ This repository contains research design only. No environment, data pipeline, tr
 | --- | --- |
 | [StochRL26_ID_Name_Proposal.tex](StochRL26_ID_Name_Proposal.tex) | Original course template, preserved. |
 | [StochRL26_ResidualRisk_Proposal_Draft.tex](StochRL26_ResidualRisk_Proposal_Draft.tex) | Current proposal centered on paired accounts and an intervention-loss budget. |
+| [StochRL26_StructuredPricing_Proposal.tex](StochRL26_StructuredPricing_Proposal.tex) | Independent theory-focused proposal on graph-structured demand learning from stockout-censored sales. |
 | [README.md](README.md) | Expanded formulation, research rationale, experimental plan, and platform assessment. |
 
 The proposal has name/student-ID placeholders. The built-in LaTeX compiler cannot start because of an environment setup failure. Compilation and actual PDF page count remain unverified; the source targets two pages including references. Update this status only after successful compilation and page-count inspection.
+
+## Independent theoretical proposal: multiproduct dynamic pricing
+
+The [pricing proposal](StochRL26_StructuredPricing_Proposal.tex) is separate from the quant project. It uses the same required proposal sections and targets two pages including references. Its main target is **one finite-sample estimation-to-policy-error theorem** for known signed product graphs and bounded binomial demand observed through stockout censoring.
+
+The narrowed method uses constrained likelihood estimation and finite-horizon planning. The analysis tracks graph-local parameter dimension, price excitation, information loss from stockouts, and planning error. Three-product simulations illustrate the theory. Full regret guarantees, posterior-sampling analysis, graph discovery, nonlinear demand, and large-scale experiments are outside the core scope. The proposed theoretical contribution must go beyond a generic simulation lemma; exact overlap with prior work remains to be checked.
+
+The pricing draft retains author placeholders. The preview compiler failed to start, so its actual page count is unverified. The numbered research sections below concern the quant project; the pricing draft is self-contained.
 
 ## Course requirements
 
