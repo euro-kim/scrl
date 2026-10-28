@@ -1,0 +1,61 @@
+\documentclass[10pt]{article}
+\usepackage[letterpaper,margin=0.8in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\title{Decoupling Return Seeking and Risk Control\\in Portfolio Reinforcement Learning}
+\author{Name (Student ID)\\Department, Seoul National University}
+\date{}
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+\section{Motivation}
+Portfolio RL often combines return and risk in one weighted reward, obscuring whether improvements arise from forecasting, sequential control, or simply reducing market exposure. We ask: \emph{Can a separately trained risk controller improve the out-of-sample return--risk frontier of a frozen return-seeking policy, beyond conventional risk overlays?} Inspired by performance--safety decoupling in ResSafe~\cite{ressafe}, we study a financial adaptation with explicit portfolio accounting and transaction costs. This is an empirical hypothesis, not a claim of guaranteed safety or a first use of risk-aware portfolio RL.
+
+\section{Problem Definition}
+Consider a small price-taking investor allocating among $K=3$--$5$ liquid Korean ETFs and cash, without leverage or short sales. Let $x_t$ summarize observable market history and let $z_t$ contain holdings, cash, wealth, and running peak wealth. Actions specify target portfolio weights $w_t\in\Delta^{K+1}$. Market dynamics are exogenous, but account dynamics are controlled:
+\begin{equation}
+ P(x_{t+1}\mid x_{\leq t},w_t)=P(x_{t+1}\mid x_{\leq t}),\qquad
+ z_{t+1}=F(z_t,w_t,x_{t+1}).
+\end{equation}
+Here $F$ includes execution prices, drifted holdings, transaction costs, and cash feasibility. A finite history is an approximate information state, not an assumed exact Markov state. Define net log growth $g_{t+1}=\log(V_{t+1}/V_t)$ and drawdown $d_t=1-V_t/\max_{u\leq t}V_u$. Close-of-day information generates orders for the next trading day's open; neither observations nor fills may use unavailable future data.
+
+\section{Literature Review}
+ResSafe freezes a task policy and trains a residual action correction~\cite{ressafe}; financial risk requires a different objective and evaluation. Lexicographic RL provides a framework for prioritizing objectives~\cite{lex}, and risk-constrained RL treats tail risk through explicit constraints~\cite{chow}. Neural-progressive hedging already combines RL with model-guided portfolio constraint enforcement~\cite{np}. Thus, modular risk control alone is insufficient novelty. Our focus is whether exploiting exogenous market dynamics enables a useful, reusable controller under trading frictions and changing market regimes.
+
+\section{Main ideas and novelty}
+\textbf{Two-stage training.} First train a nominal PPO allocation policy to maximize $J(\pi)=\mathbb{E}[T^{-1}\sum_t g_{t+1}]$. Freeze its parameters, then train a residual controller receiving the current information state and nominal allocation $w_t^0$. Use
+\begin{equation}
+ w_t=\operatorname{Proj}_{\Delta^{K+1}}\!\left[w_t^0+\delta_\phi(x_t,z_t,w_t^0)\right].
+\end{equation}
+Actual holdings must evolve under the corrected actions; the nominal policy is queried on the resulting state. For estimated conditional covariance $\widehat\Sigma_t$ (including cash), the primary second-stage problem is
+\begin{equation}
+ \min_\phi\;\mathbb{E}\!\left[\frac1T\sum_t
+ \left(w_t^\top\widehat\Sigma_t w_t+\eta\|w_t-w_t^0\|_2^2\right)\right]
+ \quad\text{s.t.}\quad J(\pi_\phi)\geq J(\pi_0)-\epsilon.
+\end{equation}
+The tolerance $\epsilon$ is fixed using training/validation data and measured in mean daily net log-return units. An adaptive multiplier approximately enforces this empirical return constraint. It offers no out-of-sample guarantee. Separate return/risk critics estimate the signals; they do not by themselves solve the trade-off. Downside squared loss and drawdown-increment penalties are controlled reward ablations, rather than an unrestricted reward search. Variance reduction alone can collapse to cash, so return retention and exposure-matched baselines are essential.
+
+\textbf{Exogenous scenarios and model-based ablation.} Compare model-free training on historical episodes against model-based residual training on short scenarios from a fitted VAR model with jointly resampled residuals; a small probabilistic GRU is optional. Only the market process is learned; account transitions remain explicit. The same market paths evaluate different allocations with common random numbers under the price-taking simulator. This reduces comparison noise, but does not create new independent market evidence. AR/GRU prediction alone is not model-based RL: generated transitions must enter policy optimization. Test whether benefits survive forecast misspecification, rather than assuming a larger predictor helps.
+
+\section{Expected contributions}
+The intended contributions are a structured formulation separating uncontrolled market dynamics from controlled account dynamics; a return-preserving residual-risk algorithm; and a controlled empirical study of when sequential learning helps beyond one-step allocation and standard risk overlays. As a limited theoretical result, establish that with action-independent market observations, no trading costs, no account-dependent constraints, and additive per-period utility depending only on current market information and allocation, optimization reduces to conditional one-step utility maximization. Costs and path-dependent objectives motivate the sequential setting studied here.
+
+\section{Detailed plan}
+\textbf{Week 1: feasibility and simulator.} Confirm IntelliQuant history entitlements and permission/support for training-data export. Public documentation describes JavaScript strategies, historical market/fundamental access, execution settings, and paid-tier result downloads~\cite{iq}; a Python training API and raw-data bulk export remain unverified. Train locally only on legitimately accessible data. Use IntelliQuant for final backtest replication via a compact JavaScript policy, subject to runtime limits. If data extraction is unavailable, use a separately licensed dataset for training and disclose the source difference. Verify next-open execution, distributions/adjustments, costs, missing data, and ETF listing dates; do not choose today's winners retrospectively.
+
+\textbf{Weeks 2--3: core experiments.} Implement the nominal policy, joint return--risk PPO, and residual PPO. Compare with equal weight, nominal plus volatility targeting, nominal plus a covariance-based minimum-deviation optimization filter, and a forecast-plus-one-step allocator. If fractional-share accounting is differentiable, include direct policy optimization through historical replay as a sequential baseline. Match information, allocation limits, costs, and tuning budgets. Fit scalers, covariance estimators, and any predictors using available past data only. Freeze all learned parameters within each test block.
+
+\textbf{Weeks 4--5: validation and extensions.} Run chronological walk-forward evaluation with distinct training, validation, and untouched test blocks; purge overlapping target horizons. Add the VAR scenario experiment, then the GRU only if time permits. Report net growth, volatility, Sharpe, maximum drawdown, turnover, realized tail losses, return-constraint violations, and average cash exposure. Use multiple training seeds and paired moving-block bootstrap intervals; seeds are not independent market samples. Compare at matched volatility/exposure, test higher costs and adverse regimes, and report both training stages' compute. Removing costs and path dependence tests whether RL's advantage disappears. A null result against conventional controls is an informative outcome.
+
+\clearpage
+\begin{thebibliography}{9}
+\bibitem{ressafe} G. Qu et al. \emph{ResSafe: Learning Safety Filtering with Residual Reinforcement Learning for Humanoids}. arXiv:2609.15988, 2026. \url{https://arxiv.org/abs/2609.15988}.
+\bibitem{lex} J. Skalse, L. Hammond, C. Griffin, and A. Abate. \emph{Lexicographic Multi-Objective Reinforcement Learning}. IJCAI, pp. 3430--3436, 2022. \url{https://www.ijcai.org/proceedings/2022/476}.
+\bibitem{chow} Y. Chow, M. Ghavamzadeh, L. Janson, and M. Pavone. \emph{Risk-Constrained Reinforcement Learning with Percentile Risk Criteria}. JMLR, 18(167):1--51, 2018. \url{https://www.jmlr.org/papers/v18/15-636.html}.
+\bibitem{np} S. Ghosh, L. Wynter, S. H. Lim, and D. T. Nguyen. \emph{Neural-progressive hedging: Enforcing constraints in reinforcement learning with stochastic programming}. UAI, PMLR 180:707--717, 2022. \url{https://proceedings.mlr.press/v180/ghosh22a.html}.
+\bibitem{iq} IntelliQuant. \emph{Strategy/API documentation and membership}. Accessed October 28, 2026. \url{https://www.intelliquant.ai/help/manual/1}; \url{https://www.intelliquant.ai/help/ref/15}; \url{https://www.intelliquant.ai/membership}.
+\end{thebibliography}
+\end{document}
